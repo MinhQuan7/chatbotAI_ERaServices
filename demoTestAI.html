@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>IoT On/Off Dashboard</title>
+    <style>
+      :root {
+        --primary-color: #0f0c29;
+        --secondary-color: #302b63;
+        --accent-color: #a18cd1;
+        --gradient-start: #0f0c29;
+        --gradient-end: #302b63;
+        --text-color: #fff;
+        --card-bg: rgba(255, 255, 255, 0.1);
+        --card-border: 1px solid rgba(255, 255, 255, 0.3);
+        --transition-duration: 0.3s;
+      }
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      body {
+        background: linear-gradient(
+          135deg,
+          var(--gradient-start),
+          var(--gradient-end)
+        );
+        font-family: "Helvetica Neue", sans-serif;
+        color: var(--text-color);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 100vh;
+      }
+      .container {
+        padding: 2rem;
+      }
+      .card {
+        background: var(--card-bg);
+        border: var(--card-border);
+        border-radius: 15px;
+        backdrop-filter: blur(10px);
+        padding: 2rem;
+        width: 100%;
+        max-width: 400px;
+        text-align: center;
+        transition: transform var(--transition-duration);
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+      }
+      .card:hover {
+        transform: scale(1.02);
+      }
+      .card h1 {
+        margin-bottom: 1rem;
+        font-size: 1.5rem;
+      }
+      .toggle-btn {
+        display: inline-block;
+        background: none;
+        border: none;
+        cursor: pointer;
+        position: relative;
+        padding: 1rem 2rem;
+        border-radius: 50px;
+        font-size: 1.2rem;
+        transition: background var(--transition-duration),
+          color var(--transition-duration);
+        outline: none;
+      }
+      .toggle-btn.on {
+        background: linear-gradient(
+          135deg,
+          var(--accent-color),
+          var(--secondary-color)
+        );
+        color: var(--text-color);
+      }
+      .toggle-btn.off {
+        background: none;
+        color: var(--text-color);
+      }
+      .toggle-btn:hover {
+        filter: brightness(1.1);
+      }
+      .status {
+        margin-top: 1rem;
+        font-size: 1rem;
+        text-align: center;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="card">
+        <h1>IoT Device Control</h1>
+        <button
+          id="toggleButton"
+          class="toggle-btn off"
+          onclick="toggleDevice(this.classList.contains('on'))"
+        >
+          Turn On
+        </button>
+        <div id="status" class="status">Status: Unknown</div>
+      </div>
+    </div>
+
+    <script>
+      // Example placeholder for E-Ra integration
+      // Assume EraWidget is available globally
+      const eraWidget = new EraWidget();
+      let configData = {};
+      let onAction = null; // Action bật
+      let offAction = null; // Action tắt
+      var deviceState = false; // false means off, true means on
+
+      // Cho switch on/off
+      function toggleDevice(isOn) {
+        const toggleBtn = document.getElementById("toggleButton");
+        if (isOn) {
+          // Turn on if currently off
+          if (!deviceState) {
+            deviceState = true;
+            toggleBtn.classList.remove("off");
+            toggleBtn.classList.add("on");
+            toggleBtn.textContent = "Turn Off";
+            if (onAction) {
+              eraWidget.triggerAction(onAction.action, null);
+            }
+          }
+        } else {
+          // Turn off if currently on
+          if (deviceState) {
+            deviceState = false;
+            toggleBtn.classList.remove("on");
+            toggleBtn.classList.add("off");
+            toggleBtn.textContent = "Turn On";
+            if (offAction) {
+              eraWidget.triggerAction(offAction.action, null);
+            }
+          }
+        }
+      }
+
+      eraWidget.init({
+        onConfiguration: (configuration) => {
+          // Lấy config theo KEY thay vì index
+          configData = configuration.realtime_configs.find(
+            (c) => c.key === "temp"
+          );
+          onAction = configuration.actions.find((a) => a.key === "on");
+          offAction = configuration.actions.find((a) => a.key === "off");
+        },
+        onValues: (values) => {
+          if (configData && values[configData.id]) {
+            const sensorValue = values[configData.id].value;
+            updateUI(sensorValue);
+          }
+        },
+        onHistory: (histories) => {
+          // Xử lý dữ liệu lịch sử nếu cần, ví dụ cập nhật biểu đồ
+        },
+      });
+
+      function updateUI(sensorValue) {
+        // Example: update status based on sensor value
+        // This is just a placeholder logic. In a real scenario, device state might be determined differently.
+        // For demonstration, if sensorValue > threshold then device is considered "on"
+        const statusDisplay = document.getElementById("status");
+        if (sensorValue > 25) {
+          statusDisplay.textContent = "Status: Device On";
+          // update button styling
+          const toggleBtn = document.getElementById("toggleButton");
+          toggleBtn.classList.remove("off");
+          toggleBtn.classList.add("on");
+          toggleBtn.textContent = "Turn Off";
+        } else {
+          statusDisplay.textContent = "Status: Device Off";
+          const toggleBtn = document.getElementById("toggleButton");
+          toggleBtn.classList.remove("on");
+          toggleBtn.classList.add("off");
+          toggleBtn.textContent = "Turn On";
+        }
+      }
+
+      // Cho slider/button điều khiển giá trị liên tục (if needed)
+      function controlDevice(value) {
+        if (onAction) {
+          eraWidget.triggerAction(onAction.action, null, { value: value });
+        }
+      }
+
+      // YÊU CẦU LỊCH SỬ (Cho biểu đồ):
+      function requestHistory() {
+        const endTime = new Date();
+        const startTime = new Date(endTime.getTime() - 24 * 60 * 60 * 1000); // 24h trước
+        eraWidget.requestHistories(
+          startTime.toISOString(),
+          endTime.toISOString()
+        );
+      }
+
+      // Example of requesting history on load
+      window.addEventListener("load", requestHistory);
+    </script>
+  </body>
+</html>
